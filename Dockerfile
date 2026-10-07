@@ -11,11 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv for high-speed package management
 RUN pip install --no-cache-dir uv
 
-# Clone and install WunderCorp Loki Agent
+# Clone and install WunderCorp Loki Agent with messaging suite
 WORKDIR /app
 RUN git clone --depth 1 https://github.com/wundercorp/loki.git /app/loki-agent
 WORKDIR /app/loki-agent
-RUN uv pip install --system -e .
+RUN uv pip install --system -e ".[messaging]" "python-telegram-bot[webhooks]>=21.0" aiohttp httpx
 
 # Setup runtime working directory
 WORKDIR /workspace
