@@ -69,88 +69,8 @@ jobs:
             curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=true" || true
           fi
           
-          USER_ID="${TELEGRAM_ALLOWED_USERS:-6486771356}"
-          
-          # Universal Direct REST Provider Configuration
-          if [ -n "$OPENROUTER_API_KEY" ]; then
-            MODEL_NAME="meta-llama/llama-3.3-70b-instruct:free"
-            API_BASE="https://openrouter.ai/api/v1"
-            ACTIVE_KEY="$OPENROUTER_API_KEY"
-            echo "🌐 Active Provider: OpenRouter Billion-Token Free Pool ($MODEL_NAME)"
-          elif [ -n "$GROQ_API_KEY" ]; then
-            MODEL_NAME="llama-3.3-70b-versatile"
-            API_BASE="https://api.groq.com/openai/v1"
-            ACTIVE_KEY="$GROQ_API_KEY"
-            echo "⚡ Active Provider: Groq Ultra-Fast ($MODEL_NAME)"
-          elif [ -n "$GEMINI_API_KEY" ] || [ -n "$GOOGLE_API_KEY" ]; then
-            MODEL_NAME="gemini-2.0-flash"
-            API_BASE="https://generativelanguage.googleapis.com/v1beta/openai/"
-            ACTIVE_KEY="${GEMINI_API_KEY:-$GOOGLE_API_KEY}"
-            echo "✨ Active Provider: Google Gemini ($MODEL_NAME)"
-          else
-            MODEL_NAME="gpt-4o-mini"
-            API_BASE="https://api.openai.com/v1"
-            ACTIVE_KEY="$OPENAI_API_KEY"
-            echo "🤖 Active Provider: OpenAI ($MODEL_NAME)"
-          fi
-          
-          # Write clean YAML config (Direct REST provider with base_url and api_key)
-          cat << EOF > ~/.loki/config.yaml
-          database:
-            journal_mode: delete
-          model:
-            default: ${MODEL_NAME}
-            provider: custom
-            base_url: ${API_BASE}
-            api_key: "${ACTIVE_KEY}"
-            context_length: 131072
-          compression:
-            enabled: true
-            threshold: 0.75
-            target_ratio: 0.30
-            protect_last_n: 12
-            protect_first_n: 2
-            proactive_prune_tokens: 4096
-            proactive_prune_min_result_chars: 4000
-            proactive_prune_min_reclaim_tokens: 2048
-          memory:
-            enabled: true
-            summary_on_overflow: true
-          gateway:
-            allow_all_users: true
-            platforms:
-              telegram:
-                enabled: true
-                allow_all_users: true
-                extra:
-                  status_indicator: true
-                  allowed_users:
-                    - "6486771356"
-                    - "${USER_ID}"
-                    - "Dkx"
-          workspace:
-            root: "${GITHUB_WORKSPACE}"
-          terminal:
-            cwd: "${GITHUB_WORKSPACE}"
-          EOF
-
-          cat << EOF > ~/.loki/.env
-          TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-          TELEGRAM_ALLOWED_USERS=6486771356,${USER_ID},Dkx
-          TELEGRAM_HOME_CHANNEL=6486771356
-          GATEWAY_ALLOW_ALL_USERS=true
-          TELEGRAM_ALLOW_ALL_USERS=true
-          OPENAI_API_KEY=${ACTIVE_KEY}
-          OPENAI_BASE_URL=${API_BASE}
-          CUSTOM_API_KEY=${ACTIVE_KEY}
-          CUSTOM_BASE_URL=${API_BASE}
-          OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-          OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-          GROQ_API_KEY=${GROQ_API_KEY}
-          GEMINI_API_KEY=${GEMINI_API_KEY}
-          GOOGLE_API_KEY=${GOOGLE_API_KEY:-$GEMINI_API_KEY}
-          LOKI_WORKSPACE=${GITHUB_WORKSPACE}
-          EOF
+          # Run Intelligent Live Provider Probe & Configurator
+          python tools/configure_omniroute.py
 
           # Register Telegram Auth Login
           mkdir -p ~/.loki/gateway
@@ -169,13 +89,11 @@ jobs:
           GATEWAY_ALLOW_ALL_USERS: "true"
           TELEGRAM_ALLOW_ALL_USERS: "true"
           LOKI_TELEGRAM_ALLOW_ALL: "true"
-          OPENAI_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.GROQ_API_KEY || secrets.GEMINI_API_KEY || secrets.OPENAI_API_KEY }}
-          OPENAI_BASE_URL: https://openrouter.ai/api/v1
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          OPENROUTER_BASE_URL: https://openrouter.ai/api/v1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           LOKI_WORKSPACE: ${{ github.workspace }}
           AUTH_TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
@@ -183,6 +101,13 @@ jobs:
           cd "${GITHUB_WORKSPACE}"
           export LOKI_NIX_BUILD=1
           export PYTHONPATH="/tmp/loki-agent:$PYTHONPATH"
+
+          # Load dynamic verified provider environment
+          if [ -f /home/runner/.loki/.env ]; then
+            set -a
+            source /home/runner/.loki/.env
+            set +a
+          fi
           
           # Launch Gateway in background from the repository root
           if python3 -c "import loki_cli" 2>/dev/null; then
