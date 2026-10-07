@@ -56,7 +56,13 @@ jobs:
             context_length: 131072
           compression:
             enabled: true
-            threshold: 0.5
+            threshold: 0.35
+            target_ratio: 0.15
+            protect_last_n: 8
+            protect_first_n: 2
+            proactive_prune_tokens: 2048
+            proactive_prune_min_result_chars: 3000
+            proactive_prune_min_reclaim_tokens: 1024
           gateway:
             platforms:
               telegram:
