@@ -17,7 +17,8 @@ __pycache__/
 .loki/
 state.db*
 
-# OS specific
-Thumbs.db
-Desktop.ini
-.DS_Store
+# Cloned reference & local builds
+loki_official/
+portfolio_masterpiece/
+*.img
+
