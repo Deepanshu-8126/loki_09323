@@ -1,4 +1,4 @@
-name: Loki 24/7 Cloud Gateway
+name: Loki 24/7 Cloud Gateway & Auto-Git Sync
 
 on:
   push:
@@ -13,17 +13,30 @@ concurrency:
 
 jobs:
   gateway:
-    name: 🚀 24/7 Autonomous Telegram Gateway
+    name: 🚀 24/7 Autonomous Telegram Gateway + Auto-Git Sync
     runs-on: ubuntu-latest
     timeout-minutes: 355
+    permissions:
+      contents: write
+      pull-requests: write
+
     steps:
       - name: 📦 Checkout Repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: 🐍 Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: ⚙️ Setup Git Config
+        run: |
+          git config --global user.name "Loki Autonomous Bot"
+          git config --global user.email "loki-bot@users.noreply.github.com"
+          git config --global pull.rebase true
 
       - name: ⚡ Install uv, Loki Core & Telegram Messaging Dependencies
         env:
@@ -36,7 +49,7 @@ jobs:
           uv pip install --system -e ".[messaging]" || uv pip install --system -e .
           uv pip install --system "python-telegram-bot[webhooks]>=21.0" aiohttp httpx
 
-      - name: ⚙️ Configure Loki & Authorization
+      - name: ⚙️ Configure Loki Workspace & Authorization
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALLOWED_USERS: ${{ secrets.TELEGRAM_ALLOWED_USERS }}
@@ -49,7 +62,8 @@ jobs:
           
           USER_ID="${TELEGRAM_ALLOWED_USERS:-6486771356}"
           
-          cat << 'EOF' > ~/.loki/config.yaml
+          # Configure model, Telegram gateway, and workspace root pointing to repository
+          cat << EOF > ~/.loki/config.yaml
           database:
             journal_mode: delete
           model:
@@ -57,12 +71,6 @@ jobs:
             provider: custom
             base_url: https://api.groq.com/openai/v1
             context_length: 131072
-          compression:
-            enabled: true
-            threshold: 0.35
-            target_ratio: 0.15
-            protect_last_n: 8
-            protect_first_n: 2
           gateway:
             allow_all_users: true
             platforms:
@@ -73,7 +81,10 @@ jobs:
                   status_indicator: true
                   allowed_users:
                     - "6486771356"
+                    - "${USER_ID}"
                     - "Dkx"
+          workspace:
+            root: "${GITHUB_WORKSPACE}"
           EOF
 
           cat << EOF > ~/.loki/.env
@@ -88,15 +99,16 @@ jobs:
           GEMINI_API_KEY=${GEMINI_API_KEY}
           GOOGLE_API_KEY=${GOOGLE_API_KEY:-$GEMINI_API_KEY}
           OPENAI_API_KEY=${OPENAI_API_KEY}
+          LOKI_WORKSPACE=${GITHUB_WORKSPACE}
           EOF
 
-          # Telegram CLI Auth Token registration
+          # Register Telegram Auth Login
           mkdir -p ~/.loki/gateway
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
             echo "$TELEGRAM_BOT_TOKEN" | python3 -m loki_cli.main auth login telegram --token-stdin 2>/dev/null || true
           fi
 
-      - name: 🌐 Launch Autonomous 24/7 Telegram Gateway
+      - name: 🌐 Run Gateway 24/7 + Auto-Sync Code to GitHub
         env:
           PYTHONPATH: /tmp/loki-agent
           LOKI_HOME: /home/runner/.loki
@@ -113,14 +125,43 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LOKI_WORKSPACE: ${{ github.workspace }}
         run: |
-          echo "🚀 Starting Loki Autonomous Telegram Gateway..."
+          echo "🚀 Starting Loki 24/7 Telegram Gateway with Auto-Git Persistence..."
           cd /tmp/loki-agent
           export LOKI_NIX_BUILD=1
+          
+          # Launch Gateway in background
           if command -v loki &> /dev/null; then
-            loki gateway run
+            loki gateway run &
           elif python3 -c "import loki_cli" 2>/dev/null; then
-            python3 -m loki_cli.main gateway run
+            python3 -m loki_cli.main gateway run &
           else
-            python3 -m loki gateway run
+            python3 -m loki gateway run &
+          fi
+          
+          GATEWAY_PID=$!
+          echo "✅ Gateway active with PID: $GATEWAY_PID"
+          
+          cd "${GITHUB_WORKSPACE}"
+          
+          # Real-time Auto Sync loop: checks every 60 seconds for newly generated files
+          while kill -0 $GATEWAY_PID 2>/dev/null; do
+            sleep 60
+            
+            # Check if Loki generated/modified files in the workspace repo
+            if [[ -n $(git status --porcelain) ]]; then
+              echo "📝 Changes detected in repository! Committing and pushing to GitHub..."
+              git add -A
+              git commit -m "feat(loki): autonomous code update from telegram [skip ci]" || true
+              git push origin main || git push || true
+              echo "✅ Successfully synced code changes to GitHub repository!"
+            fi
+          done
+          
+          # Final sync upon gateway exit
+          if [[ -n $(git status --porcelain) ]]; then
+            git add -A
+            git commit -m "feat(loki): final code persistence upon session completion [skip ci]" || true
+            git push origin main || git push || true
           fi
