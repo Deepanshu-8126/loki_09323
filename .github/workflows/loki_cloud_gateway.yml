@@ -60,6 +60,12 @@ jobs:
         run: |
           mkdir -p ~/.loki
           
+          # Reset any hanging Telegram webhook/polling sessions to prevent conflict
+          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+            echo "🔄 Resetting Telegram session state..."
+            curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=true" || true
+          fi
+          
           USER_ID="${TELEGRAM_ALLOWED_USERS:-6486771356}"
           
           # Configure model, Telegram gateway, and workspace root pointing to repository
@@ -85,6 +91,8 @@ jobs:
                     - "Dkx"
           workspace:
             root: "${GITHUB_WORKSPACE}"
+          terminal:
+            cwd: "${GITHUB_WORKSPACE}"
           EOF
 
           cat << EOF > ~/.loki/.env
@@ -110,7 +118,7 @@ jobs:
 
       - name: 🌐 Run Gateway 24/7 + Auto-Sync Code to GitHub
         env:
-          PYTHONPATH: /tmp/loki-agent
+          PYTHONPATH: "/tmp/loki-agent"
           LOKI_HOME: /home/runner/.loki
           LOKI_NIX_BUILD: "1"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -128,23 +136,22 @@ jobs:
           LOKI_WORKSPACE: ${{ github.workspace }}
           AUTH_TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
-          echo "🚀 Starting Loki 24/7 Telegram Gateway with Auto-Git Persistence..."
-          cd /tmp/loki-agent
+          echo "🚀 Starting Loki 24/7 Telegram Gateway in project workspace..."
+          cd "${GITHUB_WORKSPACE}"
           export LOKI_NIX_BUILD=1
+          export PYTHONPATH="/tmp/loki-agent:$PYTHONPATH"
           
-          # Launch Gateway in background
-          if command -v loki &> /dev/null; then
-            loki gateway run &
-          elif python3 -c "import loki_cli" 2>/dev/null; then
+          # Launch Gateway in background from the repository root
+          if python3 -c "import loki_cli" 2>/dev/null; then
             python3 -m loki_cli.main gateway run &
+          elif command -v loki &> /dev/null; then
+            loki gateway run &
           else
             python3 -m loki gateway run &
           fi
           
           GATEWAY_PID=$!
-          echo "✅ Gateway active with PID: $GATEWAY_PID"
-          
-          cd "${GITHUB_WORKSPACE}"
+          echo "✅ Gateway active with PID: $GATEWAY_PID (Working directory: ${GITHUB_WORKSPACE})"
           
           # Real-time Auto Sync loop: checks every 60 seconds for newly generated files
           while kill -0 $GATEWAY_PID 2>/dev/null; do
