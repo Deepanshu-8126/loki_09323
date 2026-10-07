@@ -7,7 +7,8 @@ import urllib.error
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
-url = 'https://api.github.com/repos/Deepanshu-8126/loki_09323/actions/runs/37621786154/jobs'
+run_id = sys.argv[1] if len(sys.argv) > 1 else '37627227551'
+url = f'https://api.github.com/repos/Deepanshu-8126/loki_09323/actions/runs/{run_id}/jobs'
 req = urllib.request.Request(url, headers={'User-Agent': 'LokiAuditor/1.0', 'Accept': 'application/vnd.github.v3+json'})
 
 try:
