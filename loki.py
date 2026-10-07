@@ -28,13 +28,25 @@ if hasattr(sys.stderr, 'reconfigure'):
 BASE_DIR = Path(__file__).parent.resolve()
 PROJECTS_DIR = Path("D:/projects").resolve()
 
-# Free Inference Providers Pool
+# Free Inference & OmniRoute Providers Pool
 PROVIDERS = {
+    "openrouter": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "model": "deepseek/deepseek-r1:free",
+        "key_env": "OPENROUTER_API_KEY",
+        "default_key": "sk-or-v1-free-pool"
+    },
     "groq": {
         "url": "https://api.groq.com/openai/v1/chat/completions",
         "model": "llama-3.3-70b-versatile",
         "key_env": "GROQ_API_KEY",
         "default_key": "gsk_groq_free_pool"
+    },
+    "gemini": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        "model": "gemini-2.0-flash",
+        "key_env": "GEMINI_API_KEY",
+        "default_key": "AIzaSy_gemini_pool"
     },
     "nvidia": {
         "url": "https://integrate.api.nvidia.com/v1/chat/completions",

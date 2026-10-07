@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   gateway:
-    name: 🚀 24/7 Autonomous Telegram Gateway + Auto-Git Sync
+    name: 🚀 24/7 Autonomous Telegram Gateway + OmniRoute Engine
     runs-on: ubuntu-latest
     timeout-minutes: 355
     permissions:
@@ -49,14 +49,17 @@ jobs:
           uv pip install --system -e ".[messaging]" || uv pip install --system -e .
           uv pip install --system "python-telegram-bot[webhooks]>=21.0" aiohttp httpx
 
-      - name: ⚙️ Configure Loki Workspace & Authorization
+      - name: ⚙️ Configure Loki Workspace, OmniRoute & Authorization
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALLOWED_USERS: ${{ secrets.TELEGRAM_ALLOWED_USERS }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: |
           mkdir -p ~/.loki
           
@@ -68,14 +71,34 @@ jobs:
           
           USER_ID="${TELEGRAM_ALLOWED_USERS:-6486771356}"
           
-          # Configure model, Telegram gateway, and workspace root pointing to repository
+          # Dynamic OmniRoute Provider Selection
+          # Priority: OpenRouter (Billion Tokens Pool) -> Groq (Blazing 70B) -> Gemini (2M Token Context)
+          if [ -n "$OPENROUTER_API_KEY" ]; then
+            MODEL_DEFAULT="deepseek/deepseek-r1:free"
+            BASE_URL="https://openrouter.ai/api/v1"
+            PRIMARY_API_KEY="$OPENROUTER_API_KEY"
+            echo "🌐 OmniRoute active: OpenRouter Multi-Model Billion Token Pool"
+          elif [ -n "$GROQ_API_KEY" ]; then
+            MODEL_DEFAULT="llama-3.3-70b-versatile"
+            BASE_URL="https://api.groq.com/openai/v1"
+            PRIMARY_API_KEY="$GROQ_API_KEY"
+            echo "⚡ OmniRoute active: Groq Ultra-Fast Llama 3.3 70B"
+          else
+            MODEL_DEFAULT="gemini-2.0-flash"
+            BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/"
+            PRIMARY_API_KEY="${GEMINI_API_KEY:-$GOOGLE_API_KEY}"
+            echo "✨ OmniRoute active: Google Gemini 2.0 High-Speed Engine"
+          fi
+          
+          # Write clean YAML config
           cat << EOF > ~/.loki/config.yaml
           database:
             journal_mode: delete
           model:
-            default: llama-3.3-70b-versatile
+            default: ${MODEL_DEFAULT}
             provider: custom
-            base_url: https://api.groq.com/openai/v1
+            base_url: ${BASE_URL}
+            api_key: "${PRIMARY_API_KEY}"
             context_length: 131072
           gateway:
             allow_all_users: true
@@ -101,12 +124,15 @@ jobs:
           TELEGRAM_HOME_CHANNEL=6486771356
           GATEWAY_ALLOW_ALL_USERS=true
           TELEGRAM_ALLOW_ALL_USERS=true
-          CUSTOM_API_KEY=${GROQ_API_KEY}
-          CUSTOM_BASE_URL=https://api.groq.com/openai/v1
+          CUSTOM_API_KEY=${PRIMARY_API_KEY}
+          CUSTOM_BASE_URL=${BASE_URL}
+          OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
           GROQ_API_KEY=${GROQ_API_KEY}
+          DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
           GEMINI_API_KEY=${GEMINI_API_KEY}
           GOOGLE_API_KEY=${GOOGLE_API_KEY:-$GEMINI_API_KEY}
           OPENAI_API_KEY=${OPENAI_API_KEY}
+          NVIDIA_API_KEY=${NVIDIA_API_KEY}
           LOKI_WORKSPACE=${GITHUB_WORKSPACE}
           EOF
 
@@ -127,16 +153,17 @@ jobs:
           GATEWAY_ALLOW_ALL_USERS: "true"
           TELEGRAM_ALLOW_ALL_USERS: "true"
           LOKI_TELEGRAM_ALLOW_ALL: "true"
-          CUSTOM_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          CUSTOM_BASE_URL: https://api.groq.com/openai/v1
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           LOKI_WORKSPACE: ${{ github.workspace }}
           AUTH_TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
-          echo "🚀 Starting Loki 24/7 Telegram Gateway in project workspace..."
+          echo "🚀 Starting Loki 24/7 Telegram Gateway in project workspace with OmniRoute..."
           cd "${GITHUB_WORKSPACE}"
           export LOKI_NIX_BUILD=1
           export PYTHONPATH="/tmp/loki-agent:$PYTHONPATH"
