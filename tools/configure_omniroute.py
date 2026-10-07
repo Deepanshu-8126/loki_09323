@@ -59,17 +59,42 @@ def reset_stale_sessions(db_path: Path):
         conn = sqlite3.connect(str(db_path))
         cur = conn.cursor()
         # Clear any session model_override that might be pointing to a dead provider
-        cur.execute("UPDATE sessions SET model = NULL, model_config = NULL WHERE model_config IS NOT NULL")
+        cur.execute("UPDATE sessions SET model = NULL, model_config = NULL")
         conn.commit()
         conn.close()
         print(f"   🧹 Cleared stale session overrides in {db_path.name}")
     except Exception as e:
         print(f"   ⚠️ Note on session DB maintenance: {e}")
 
+def load_env_files():
+    """Load API keys and tokens from existing .env files if not in os.environ."""
+    candidates = [
+        Path.home() / ".loki" / ".env",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "loki" / ".env" if os.environ.get("LOCALAPPDATA") else None,
+        Path.cwd() / ".env",
+        Path("d:/affi/.env"),
+        Path("d:/SHELF_STORE/.env")
+    ]
+    for p in candidates:
+        if p and p.exists():
+            try:
+                for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.split("#")[0].strip().strip('"').strip("'")
+                        if k and v and not os.environ.get(k):
+                            os.environ[k] = v
+            except Exception:
+                pass
+
 def main():
     print("========================================================")
     print("🚀 OMNIROUTE REAL-TIME PROVIDER PROBE & AUTO-CONFIG")
     print("========================================================")
+
+    load_env_files()
 
     groq_key = os.environ.get('GROQ_API_KEY', '').strip()
     gemini_key = os.environ.get('GEMINI_API_KEY', '').strip() or os.environ.get('GOOGLE_API_KEY', '').strip()
@@ -233,7 +258,6 @@ LOKI_TELEGRAM_ALLOW_ALL=true
             env_file.write_text(env_content, encoding="utf-8")
             print(f"📝 Wrote environment variables to {env_file}")
 
-            # Generate ~/.loki/auth.json to pre-populate custom credentials and clean stale rate-limits
             auth_data = {
                 "version": 1,
                 "active_provider": "custom",
@@ -245,10 +269,24 @@ LOKI_TELEGRAM_ALLOW_ALL=true
                     "groq": {
                         "api_key": groq_key or selected_key,
                         "base_url": "https://api.groq.com/openai/v1"
+                    },
+                    "openai": {
+                        "api_key": selected_key,
+                        "base_url": selected_base_url
                     }
                 },
                 "credential_pool": {}
             }
+            if gemini_key:
+                auth_data["providers"]["gemini"] = {
+                    "api_key": gemini_key,
+                    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai"
+                }
+            if openrouter_key:
+                auth_data["providers"]["openrouter"] = {
+                    "api_key": openrouter_key,
+                    "base_url": "https://openrouter.ai/api/v1"
+                }
             auth_file = loki_dir / "auth.json"
             auth_file.write_text(json.dumps(auth_data, indent=2), encoding="utf-8")
             print(f"📝 Wrote authenticated store to {auth_file}")
