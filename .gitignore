@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments & Secret Keys (CRITICAL: Never commit .env)
+.env
+.env.local
+*.key
+*.pem
+*.token
+
+# Local databases & state
+*.db
+*.sqlite
+*.sqlite3
+.loki/
+state.db*
+
+# OS specific
+Thumbs.db
+Desktop.ini
+.DS_Store
