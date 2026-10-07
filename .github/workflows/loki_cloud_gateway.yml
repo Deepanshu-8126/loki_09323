@@ -107,7 +107,17 @@ jobs:
             api_key: "${PRIMARY_API_KEY}"
             context_length: 131072
           compression:
-            enabled: false
+            enabled: true
+            threshold: 0.75
+            target_ratio: 0.30
+            protect_last_n: 12
+            protect_first_n: 2
+            proactive_prune_tokens: 4096
+            proactive_prune_min_result_chars: 4000
+            proactive_prune_min_reclaim_tokens: 2048
+          memory:
+            enabled: true
+            summary_on_overflow: true
           gateway:
             allow_all_users: true
             platforms:
