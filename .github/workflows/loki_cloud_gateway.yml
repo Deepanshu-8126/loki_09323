@@ -32,17 +32,16 @@ jobs:
       - name: ⚙️ Configure Cloud Environment
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_ALLOWED_USERS: ${{ secrets.TELEGRAM_ALLOWED_USERS }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           mkdir -p ~/.loki
-          cat << EOF > ~/.loki/config.yaml
+          cat << 'EOF' > ~/.loki/config.yaml
           database:
             journal_mode: delete
           model:
-            default: groq/llama-3.3-70b-versatile
-            context_length: 131072
+            default: gemini/gemini-1.5-flash
+            context_length: 32000
           gateway:
             allow_all_users: true
             platforms:
@@ -52,9 +51,12 @@ jobs:
           cat << EOF > ~/.loki/.env
           TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
           TELEGRAM_ALLOWED_USERS=6486771356
+          TELEGRAM_HOME_CHANNEL=6486771356
           GATEWAY_ALLOW_ALL_USERS=true
+          TELEGRAM_ALLOW_ALL_USERS=true
           GROQ_API_KEY=${GROQ_API_KEY}
           GEMINI_API_KEY=${GEMINI_API_KEY}
+          GOOGLE_API_KEY=${GEMINI_API_KEY}
           EOF
 
       - name: 🌐 Launch Gateway
@@ -63,8 +65,11 @@ jobs:
           LOKI_HOME: /home/runner/.loki
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALLOWED_USERS: "6486771356"
+          TELEGRAM_HOME_CHANNEL: "6486771356"
           GATEWAY_ALLOW_ALL_USERS: "true"
+          TELEGRAM_ALLOW_ALL_USERS: "true"
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python3 -m loki_cli.main gateway run
