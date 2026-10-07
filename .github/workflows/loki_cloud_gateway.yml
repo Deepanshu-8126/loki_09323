@@ -49,8 +49,9 @@ jobs:
           database:
             journal_mode: wal
           model:
-            default: gemini-3.8-flash
-            provider: gemini
+            default: openai/gpt-oss-120b
+            provider: custom
+            base_url: https://api.groq.com/openai/v1
           compression:
             enabled: true
             threshold: 0.5
@@ -64,10 +65,13 @@ jobs:
           cat << EOF > ~/.loki/.env
           TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
           TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS}
+          TELEGRAM_HOME_CHANNEL=${TELEGRAM_ALLOWED_USERS}
+          CUSTOM_API_KEY=${GROQ_API_KEY}
+          CUSTOM_BASE_URL=https://api.groq.com/openai/v1
+          GROQ_API_KEY=${GROQ_API_KEY}
           GEMINI_API_KEY=${GEMINI_API_KEY}
           GOOGLE_API_KEY=${GOOGLE_API_KEY}
           GEMINI_API_KEY_BACKUP=${GEMINI_API_KEY_BACKUP}
-          GROQ_API_KEY=${GROQ_API_KEY}
           OPENAI_API_KEY=${OPENAI_API_KEY}
           EOF
 
