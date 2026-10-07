@@ -72,15 +72,15 @@ jobs:
           USER_ID="${TELEGRAM_ALLOWED_USERS:-6486771356}"
           
           # Universal LiteLLM/Loki Canonical Model Formatting
-          if [ -n "$GROQ_API_KEY" ]; then
+          if [ -n "$OPENROUTER_API_KEY" ]; then
+            MODEL_FULL="openrouter/meta-llama/llama-3.3-70b-instruct:free"
+            echo "🌐 Active Provider: OpenRouter Billion-Token Pool (openrouter/meta-llama/llama-3.3-70b-instruct:free)"
+          elif [ -n "$GROQ_API_KEY" ]; then
             MODEL_FULL="groq/llama-3.3-70b-versatile"
             echo "⚡ Active Provider: Groq Ultra-Fast (groq/llama-3.3-70b-versatile)"
           elif [ -n "$GEMINI_API_KEY" ] || [ -n "$GOOGLE_API_KEY" ]; then
             MODEL_FULL="gemini/gemini-2.0-flash"
             echo "✨ Active Provider: Google Gemini (gemini/gemini-2.0-flash)"
-          elif [ -n "$OPENROUTER_API_KEY" ]; then
-            MODEL_FULL="openrouter/meta-llama/llama-3.3-70b-instruct:free"
-            echo "🌐 Active Provider: OpenRouter (openrouter/meta-llama/llama-3.3-70b-instruct:free)"
           else
             MODEL_FULL="openai/gpt-4o-mini"
             echo "🤖 Active Provider: OpenAI (openai/gpt-4o-mini)"
