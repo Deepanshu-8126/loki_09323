@@ -126,6 +126,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           LOKI_WORKSPACE: ${{ github.workspace }}
+          AUTH_TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
           echo "🚀 Starting Loki 24/7 Telegram Gateway with Auto-Git Persistence..."
           cd /tmp/loki-agent
@@ -154,7 +155,7 @@ jobs:
               echo "📝 Changes detected in repository! Committing and pushing to GitHub..."
               git add -A
               git commit -m "feat(loki): autonomous code update from telegram [skip ci]" || true
-              git push origin main || git push || true
+              git push "https://x-access-token:${AUTH_TOKEN}@github.com/${{ github.repository }}.git" main || git push origin main || true
               echo "✅ Successfully synced code changes to GitHub repository!"
             fi
           done
@@ -163,5 +164,5 @@ jobs:
           if [[ -n $(git status --porcelain) ]]; then
             git add -A
             git commit -m "feat(loki): final code persistence upon session completion [skip ci]" || true
-            git push origin main || git push || true
+            git push "https://x-access-token:${AUTH_TOKEN}@github.com/${{ github.repository }}.git" main || git push origin main || true
           fi
