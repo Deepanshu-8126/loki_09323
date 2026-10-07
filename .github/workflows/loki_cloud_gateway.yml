@@ -1,9 +1,7 @@
 name: Loki 24/7 Cloud Gateway
-
 on:
   workflow_dispatch:
   schedule:
-    # Auto-triggers every 5 hours to ensure continuous 24/7 uptime
     - cron: '0 */5 * * *'
   push:
     branches: [ main, master ]
@@ -16,99 +14,57 @@ jobs:
   run-loki-gateway:
     name: 🚀 24/7 Autonomous Telegram Gateway
     runs-on: ubuntu-latest
-    timeout-minutes: 355 # GitHub Actions max run duration
-
+    timeout-minutes: 355
     steps:
       - name: 📦 Checkout Repository
         uses: actions/checkout@v4
-
       - name: 🐍 Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: ⚡ Install uv, Loki Core & Telegram Messaging Dependencies
+      - name: ⚡ Install uv, Loki Core & Telegram
         run: |
           python -m pip install --upgrade pip uv
           git clone --depth 1 https://github.com/wundercorp/loki.git /tmp/loki-agent
           cd /tmp/loki-agent
           uv pip install --system -e ".[messaging]" "python-telegram-bot[webhooks]>=21.0" aiohttp httpx
 
-      - name: ⚙️ Configure Cloud Environment & Authorization
+      - name: ⚙️ Configure Cloud Environment
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALLOWED_USERS: ${{ secrets.TELEGRAM_ALLOWED_USERS }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GEMINI_API_KEY_BACKUP: ${{ secrets.GEMINI_API_KEY_BACKUP }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           mkdir -p ~/.loki
-          
-          # Allowlist setup (User ID: 6486771356 & Dkx)
-          USER_ID="${TELEGRAM_ALLOWED_USERS:-6486771356}"
-          
           cat << EOF > ~/.loki/config.yaml
           database:
             journal_mode: delete
           model:
-            default: openai/gpt-oss-120b
-            provider: custom
-            base_url: https://api.groq.com/openai/v1
+            default: groq/llama-3.3-70b-versatile
             context_length: 131072
-          compression:
-            enabled: true
-            threshold: 0.35
-            target_ratio: 0.15
-            protect_last_n: 8
-            protect_first_n: 2
-            proactive_prune_tokens: 2048
-            proactive_prune_min_result_chars: 3000
-            proactive_prune_min_reclaim_tokens: 1024
           gateway:
             allow_all_users: true
             platforms:
               telegram:
                 allow_all_users: true
-                extra:
-                  status_indicator: true
-                  allowed_users:
-                    - "6486771356"
-                    - "\${USER_ID}"
-                    - "Dkx"
           EOF
-
           cat << EOF > ~/.loki/.env
           TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-          TELEGRAM_ALLOWED_USERS=6486771356,${USER_ID},Dkx
-          TELEGRAM_HOME_CHANNEL=6486771356
+          TELEGRAM_ALLOWED_USERS=6486771356
           GATEWAY_ALLOW_ALL_USERS=true
-          TELEGRAM_ALLOW_ALL_USERS=true
-          CUSTOM_API_KEY=${GROQ_API_KEY}
-          CUSTOM_BASE_URL=https://api.groq.com/openai/v1
           GROQ_API_KEY=${GROQ_API_KEY}
           GEMINI_API_KEY=${GEMINI_API_KEY}
-          GOOGLE_API_KEY=${GOOGLE_API_KEY}
-          GEMINI_API_KEY_BACKUP=${GEMINI_API_KEY_BACKUP}
-          OPENAI_API_KEY=${OPENAI_API_KEY}
           EOF
 
-      - name: 🌐 Launch Autonomous 24/7 Telegram Gateway
+      - name: 🌐 Launch Gateway
         env:
           PYTHONPATH: /tmp/loki-agent
           LOKI_HOME: /home/runner/.loki
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_ALLOWED_USERS: 6486771356,Dkx
-          TELEGRAM_HOME_CHANNEL: "6486771356"
+          TELEGRAM_ALLOWED_USERS: "6486771356"
           GATEWAY_ALLOW_ALL_USERS: "true"
-          TELEGRAM_ALLOW_ALL_USERS: "true"
-          CUSTOM_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          CUSTOM_BASE_URL: https://api.groq.com/openai/v1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GEMINI_API_KEY_BACKUP: ${{ secrets.GEMINI_API_KEY_BACKUP }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python3 -m loki_cli.main gateway run
