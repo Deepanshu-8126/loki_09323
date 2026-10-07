@@ -117,11 +117,11 @@ model:
   api_key: "{selected_key}"
   context_length: 131072
 custom_providers:
-  - name: "Groq 120B (High Speed)"
+  - name: "groq"
     base_url: "https://api.groq.com/openai/v1"
     api_key: "{groq_key or selected_key}"
     model: "openai/gpt-oss-120b"
-  - name: "Qwen 27B (Fast Chat)"
+  - name: "qwen"
     base_url: "https://api.groq.com/openai/v1"
     api_key: "{groq_key or selected_key}"
     model: "qwen/qwen3.8-27b"
