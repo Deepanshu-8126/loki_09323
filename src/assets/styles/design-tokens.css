@@ -1,0 +1,11 @@
+:root {
+    --bg-deep: #090D16;
+    --card-bg: #111827;
+    --border-color: #1F2937;
+    --text-primary: #F9FAFB;
+    --accent: #3B82F6;
+    --glass: rgba(17, 24, 39, 0.7);
+}
+
+body { background: var(--bg-deep); color: var(--text-primary); font-family: 'Inter', sans-serif; }
+.admin-card { background: var(--card-bg); border: 1px solid var(--border-color); backdrop-filter: blur(12px); border-radius: 12px; }
