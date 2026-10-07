@@ -48,9 +48,9 @@ jobs:
           cd /tmp/loki-agent
           export LOKI_NIX_BUILD=1
           uv pip install --system -e ".[messaging]" || uv pip install --system -e .
-          uv pip install --system "python-telegram-bot[webhooks]>=21.0" aiohttp httpx
+          uv pip install --system "python-telegram-bot[webhooks]>=21.0" aiohttp httpx litellm
 
-      - name: ⚙️ Configure Loki Workspace, High-Speed Model & Authorization
+      - name: ⚙️ Configure Loki Model, Workspace & Authorization
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ALLOWED_USERS: ${{ secrets.TELEGRAM_ALLOWED_USERS }}
@@ -71,41 +71,27 @@ jobs:
           
           USER_ID="${TELEGRAM_ALLOWED_USERS:-6486771356}"
           
-          # High-Speed Multi-Model Selection: Prioritize Groq (0ms latency, no timeout) -> Gemini -> OpenRouter
+          # Universal LiteLLM/Loki Canonical Model Formatting
           if [ -n "$GROQ_API_KEY" ]; then
-            MODEL_DEFAULT="llama-3.3-70b-versatile"
-            PROVIDER_NAME="groq"
-            BASE_URL="https://api.groq.com/openai/v1"
-            PRIMARY_API_KEY="$GROQ_API_KEY"
-            echo "⚡ Active Provider: Groq Ultra-Fast Llama 3.3 70B (Zero Timeout)"
+            MODEL_FULL="groq/llama-3.3-70b-versatile"
+            echo "⚡ Active Provider: Groq Ultra-Fast (groq/llama-3.3-70b-versatile)"
           elif [ -n "$GEMINI_API_KEY" ] || [ -n "$GOOGLE_API_KEY" ]; then
-            MODEL_DEFAULT="gemini-2.0-flash"
-            PROVIDER_NAME="gemini"
-            BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/"
-            PRIMARY_API_KEY="${GEMINI_API_KEY:-$GOOGLE_API_KEY}"
-            echo "✨ Active Provider: Google Gemini 2.0 High-Speed Engine"
+            MODEL_FULL="gemini/gemini-2.0-flash"
+            echo "✨ Active Provider: Google Gemini (gemini/gemini-2.0-flash)"
           elif [ -n "$OPENROUTER_API_KEY" ]; then
-            MODEL_DEFAULT="meta-llama/llama-3.3-70b-instruct:free"
-            PROVIDER_NAME="openrouter"
-            BASE_URL="https://openrouter.ai/api/v1"
-            PRIMARY_API_KEY="$OPENROUTER_API_KEY"
-            echo "🌐 Active Provider: OpenRouter High-Speed Llama 3.3"
+            MODEL_FULL="openrouter/meta-llama/llama-3.3-70b-instruct:free"
+            echo "🌐 Active Provider: OpenRouter (openrouter/meta-llama/llama-3.3-70b-instruct:free)"
           else
-            MODEL_DEFAULT="gpt-4o-mini"
-            PROVIDER_NAME="openai"
-            BASE_URL="https://api.openai.com/v1"
-            PRIMARY_API_KEY="$OPENAI_API_KEY"
+            MODEL_FULL="openai/gpt-4o-mini"
+            echo "🤖 Active Provider: OpenAI (openai/gpt-4o-mini)"
           fi
           
-          # Write clean YAML config (database journal_mode delete to prevent WAL corruption)
+          # Write clean YAML config with standard LiteLLM model identifier
           cat << EOF > ~/.loki/config.yaml
           database:
             journal_mode: delete
           model:
-            default: ${MODEL_DEFAULT}
-            provider: ${PROVIDER_NAME}
-            base_url: ${BASE_URL}
-            api_key: "${PRIMARY_API_KEY}"
+            default: ${MODEL_FULL}
             context_length: 131072
           compression:
             enabled: true
@@ -143,17 +129,19 @@ jobs:
           TELEGRAM_HOME_CHANNEL=6486771356
           GATEWAY_ALLOW_ALL_USERS=true
           TELEGRAM_ALLOW_ALL_USERS=true
-          OPENAI_API_KEY=${PRIMARY_API_KEY}
-          OPENAI_BASE_URL=${BASE_URL}
-          CUSTOM_API_KEY=${PRIMARY_API_KEY}
-          CUSTOM_BASE_URL=${BASE_URL}
-          GROQ_API_KEY=${GROQ_API_KEY:-$PRIMARY_API_KEY}
+          GROQ_API_KEY=${GROQ_API_KEY}
           OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+          DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
           GEMINI_API_KEY=${GEMINI_API_KEY}
           GOOGLE_API_KEY=${GOOGLE_API_KEY:-$GEMINI_API_KEY}
+          OPENAI_API_KEY=${OPENAI_API_KEY:-$GROQ_API_KEY}
           LOKI_WORKSPACE=${GITHUB_WORKSPACE}
           EOF
 
+          # Explicitly set model via Loki CLI tool
+          cd /tmp/loki-agent
+          python3 -m loki_cli.main model set "${MODEL_FULL}" 2>/dev/null || true
+          
           # Register Telegram Auth Login
           mkdir -p ~/.loki/gateway
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
@@ -171,17 +159,16 @@ jobs:
           GATEWAY_ALLOW_ALL_USERS: "true"
           TELEGRAM_ALLOW_ALL_USERS: "true"
           LOKI_TELEGRAM_ALLOW_ALL: "true"
-          OPENAI_API_KEY: ${{ secrets.GROQ_API_KEY || secrets.GEMINI_API_KEY || secrets.OPENROUTER_API_KEY || secrets.OPENAI_API_KEY }}
-          OPENAI_BASE_URL: https://api.groq.com/openai/v1
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || secrets.GROQ_API_KEY }}
           LOKI_WORKSPACE: ${{ github.workspace }}
           AUTH_TOKEN: ${{ secrets.GH_PAT || github.token }}
         run: |
-          echo "🚀 Starting Loki 24/7 Telegram Gateway in project workspace with Ultra-Speed Model..."
+          echo "🚀 Starting Loki 24/7 Telegram Gateway in project workspace..."
           cd "${GITHUB_WORKSPACE}"
           export LOKI_NIX_BUILD=1
           export PYTHONPATH="/tmp/loki-agent:$PYTHONPATH"
