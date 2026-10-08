@@ -4,7 +4,43 @@ set -e
 echo "🚀 Starting 24/7 OmniRoute + Loki Autonomous Cloud Engine..."
 mkdir -p /root/.loki /root/.omniroute
 
-# Configure OmniRoute env
+PORT=${PORT:-10000}
+
+# 1. Start HTTP Health Check & Keep-Alive Listener FIRST so Render detects port immediately
+python3 -c "
+import http.server, socketserver, os, threading, time, urllib.request
+
+PORT = int(os.environ.get('PORT', 10000))
+RENDER_EXTERNAL_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
+
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b'OmniRoute + Loki 24/7 Swarm Gateway is LIVE & ACTIVE!')
+
+socketserver.TCPServer.allow_reuse_address = True
+httpd = socketserver.TCPServer(('0.0.0.0', PORT), Handler)
+threading.Thread(target=httpd.serve_forever, daemon=True).start()
+print(f'✅ Health check listener active on 0.0.0.0:{PORT}')
+
+def keepalive_loop():
+    while True:
+        time.sleep(240)  # Ping every 4 minutes (before Render 15-min idle timer)
+        try:
+            url = RENDER_EXTERNAL_URL or f'http://127.0.0.1:{PORT}'
+            req = urllib.request.Request(url, headers={'User-Agent': 'OmniRoute-KeepAlive/1.0'})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                pass
+        except Exception:
+            pass
+
+threading.Thread(target=keepalive_loop, daemon=True).start()
+print('✅ 24/7 Keep-Alive Self-Pinger activated (every 4 mins)')
+"
+
+# 2. Configure OmniRoute env
 cat <<EOF > /root/.omniroute/.env
 STORAGE_ENCRYPTION_KEY=3474e4c57a92da157acc17c1f13cd77a8dce909dc9f4048a83dd9d55bcae6675
 OMNIROUTE_CHAT_MAX_HEAVY_IN_FLIGHT=64
@@ -15,19 +51,19 @@ OMNIROUTE_CHAT_HEAVY_ESTIMATED_TOKENS=500000
 OMNIROUTE_CHAT_ADMISSION_HEAP_SHED_RATIO=0.98
 EOF
 
-# Start OmniRoute in background on port 20128
+# 3. Start OmniRoute in background on port 20128
 omniroute serve --port 20128 --no-open &
 
 echo "⏳ Waiting for OmniRoute to initialize..."
 sleep 5
 
-# Auto-seed providers
+# 4. Auto-seed providers
 node /workspace/seed_omniroute.js || true
 
-# Configure Loki config.yaml with Smart Compaction & Multi-Model Fallback
+# 5. Configure Loki config.yaml with Smart Compaction
 cat <<EOF > /root/.loki/config.yaml
 database:
-  journal_mode: wal
+  journal_mode: delete
 model:
   default: gemini-3.7-flash
   provider: custom
@@ -101,7 +137,7 @@ gateway:
           - "${TELEGRAM_ALLOWED_USERS:-6486771356}"
 EOF
 
-# Configure Loki .env
+# 6. Configure Loki .env
 cat <<EOF > /root/.loki/.env
 OPENAI_API_KEY=omniroute
 OPENAI_BASE_URL=http://localhost:20128/v1
@@ -114,39 +150,6 @@ TELEGRAM_HOME_CHANNEL=\${TELEGRAM_HOME_CHANNEL:-6486771356}
 GATEWAY_ALLOW_ALL_USERS=true
 TELEGRAM_ALLOW_ALL_USERS=true
 EOF
-
-# HTTP Keep-Alive listener & Self-Pinger on $PORT so Render NEVER sleeps
-python3 -c "
-import http.server, socketserver, os, threading, time, urllib.request
-
-PORT = int(os.environ.get('PORT', 10000))
-RENDER_EXTERNAL_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
-
-class Handler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
-        self.end_headers()
-        self.wfile.write(b'OmniRoute + Loki 24/7 Swarm Gateway is LIVE & ACTIVE!')
-
-httpd = socketserver.TCPServer(('', PORT), Handler)
-threading.Thread(target=httpd.serve_forever, daemon=True).start()
-print(f'✅ Health check listener active on port {PORT}')
-
-def keepalive_loop():
-    while True:
-        time.sleep(240)  # Ping every 4 minutes (before Render 15-min idle timer)
-        try:
-            url = RENDER_EXTERNAL_URL or f'http://127.0.0.1:{PORT}'
-            req = urllib.request.Request(url, headers={'User-Agent': 'OmniRoute-KeepAlive/1.0'})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                pass
-        except Exception:
-            pass
-
-threading.Thread(target=keepalive_loop, daemon=True).start()
-print('✅ 24/7 Keep-Alive Self-Pinger activated (every 4 mins)')
-"
 
 echo "🤖 Starting 24/7 Telegram Gateway with OmniRoute Multi-Model Engine..."
 exec loki gateway run --accept-hooks
