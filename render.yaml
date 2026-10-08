@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: loki-omniroute-swarm
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ALLOWED_USERS
+        value: "6486771356,Dkx"
+      - key: TELEGRAM_HOME_CHANNEL
+        value: "6486771356"
+      - key: GROQ_API_KEY
+        sync: false

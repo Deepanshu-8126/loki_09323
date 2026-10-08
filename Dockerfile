@@ -1,27 +1,37 @@
-# Loki Autonomous Telegram Agent 24/7 Cloud Container
+# Loki + OmniRoute 24/7 Autonomous Cloud Daemon
 FROM python:3.11-slim
 
-# Install system dependencies
+# Install system dependencies + Node.js 20 LTS
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     ca-certificates \
+    procps \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv for high-speed package management
-RUN pip install --no-cache-dir uv
+# Install OmniRoute globally
+RUN npm install -g omniroute
 
-# Clone and install WunderCorp Loki Agent with messaging suite
-WORKDIR /app
-RUN git clone --depth 1 https://github.com/wundercorp/loki.git /app/loki-agent
-WORKDIR /app/loki-agent
-RUN uv pip install --system -e ".[messaging]" "python-telegram-bot[webhooks]>=21.0" aiohttp httpx
+# Install Loki Agent & Telegram dependencies
+RUN pip install --no-cache-dir \
+    "git+https://github.com/wundercorp/loki.git" \
+    "python-telegram-bot[webhooks]>=21.0" \
+    aiohttp \
+    httpx \
+    openai
 
-# Setup runtime working directory
+# Setup workspace
 WORKDIR /workspace
-ENV LOKI_HOME=/root/.loki
-ENV PYTHONPATH=/app/loki-agent
+COPY . /workspace
+
+# Copy startup script
+RUN chmod +x /workspace/start.sh
+
+ENV PORT=10000
 ENV PYTHONUNBUFFERED=1
 
-# Entrypoint to launch gateway
-CMD ["python3", "-m", "loki_cli.main", "gateway", "run"]
+EXPOSE 10000 20128
+
+CMD ["/workspace/start.sh"]
