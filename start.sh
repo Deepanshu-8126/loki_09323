@@ -115,21 +115,37 @@ GATEWAY_ALLOW_ALL_USERS=true
 TELEGRAM_ALLOW_ALL_USERS=true
 EOF
 
-# HTTP Keep-Alive listener on $PORT for Render health checks
+# HTTP Keep-Alive listener & Self-Pinger on $PORT so Render NEVER sleeps
 python3 -c "
-import http.server, socketserver, os, threading
+import http.server, socketserver, os, threading, time, urllib.request
 
 PORT = int(os.environ.get('PORT', 10000))
+RENDER_EXTERNAL_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/plain')
         self.end_headers()
-        self.wfile.write(b'OmniRoute + Loki 24/7 Swarm Gateway is LIVE!')
+        self.wfile.write(b'OmniRoute + Loki 24/7 Swarm Gateway is LIVE & ACTIVE!')
 
 httpd = socketserver.TCPServer(('', PORT), Handler)
 threading.Thread(target=httpd.serve_forever, daemon=True).start()
 print(f'✅ Health check listener active on port {PORT}')
+
+def keepalive_loop():
+    while True:
+        time.sleep(240)  # Ping every 4 minutes (before Render 15-min idle timer)
+        try:
+            url = RENDER_EXTERNAL_URL or f'http://127.0.0.1:{PORT}'
+            req = urllib.request.Request(url, headers={'User-Agent': 'OmniRoute-KeepAlive/1.0'})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                pass
+        except Exception:
+            pass
+
+threading.Thread(target=keepalive_loop, daemon=True).start()
+print('✅ 24/7 Keep-Alive Self-Pinger activated (every 4 mins)')
 "
 
 echo "🤖 Starting 24/7 Telegram Gateway with OmniRoute Multi-Model Engine..."
